@@ -85,7 +85,7 @@ vm_ctx vm_create(void) {
 
     vm->reg[VM_REG_PC] = 0x3000;
     vm->reg[VM_REG_PSR] = 0b010;
-    vm->mem[VM_ADDR_MCR] = swap16(VM_STATUS_BIT);
+    vm->mem[VM_ADDR_MCR] = VM_STATUS_BIT;
 
     return vm;
 }
@@ -128,7 +128,7 @@ static vm_byte vm_read(vm_ctx vm, vm_addr addr) {
         return 0;
     }
 
-    return swap16(vm->mem[addr]);
+    return vm->mem[addr];
 }
 
 static void vm_write(vm_ctx vm, vm_addr addr, vm_byte val) {
@@ -141,7 +141,7 @@ static void vm_write(vm_ctx vm, vm_addr addr, vm_byte val) {
         return;
     }
 
-    vm->mem[addr] = swap16(val);
+    vm->mem[addr] = val;
 }
 
 void vm_load_file(vm_ctx vm, const char *file) {
@@ -169,10 +169,16 @@ void vm_load_file(vm_ctx vm, const char *file) {
 
 void vm_load_data(vm_ctx vm, unsigned const char *data, size_t length) {
     vm_addr load_addr = swap16(*((vm_addr*)data));
-    size_t load_length = length - sizeof(vm_addr);
+    size_t load_length = (length - sizeof(vm_addr)) / sizeof(vm_byte);
 
     assert(load_addr + load_length < VM_ADDR_MAX);
-    memcpy(vm->mem + load_addr, data + sizeof(vm_addr), load_length);
+
+    vm_byte *dest = vm->mem + load_addr;
+    vm_byte *source = (vm_byte*)(data + sizeof(vm_addr));
+
+    while (length-- > 0) {
+        *(dest++) = swap16(*(source++));
+    }
 }
 
 // MARK: - Execution
