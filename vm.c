@@ -16,6 +16,9 @@
 
 #include "vm.h"
 
+extern unsigned char lc3os_obj[];
+extern unsigned int lc3os_obj_len;
+
 // MARK: - Types
 
 #define VM_ADDR_MAX UINT16_MAX
@@ -142,6 +145,10 @@ static void vm_write(vm_ctx vm, vm_addr addr, vm_byte val) {
     }
 
     vm->mem[addr] = val;
+}
+
+void vm_load_os(vm_ctx vm) {
+    vm_load_data(vm, lc3os_obj, lc3os_obj_len);
 }
 
 void vm_load_file(vm_ctx vm, const char *file) {

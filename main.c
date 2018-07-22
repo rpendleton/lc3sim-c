@@ -41,7 +41,7 @@ int main(int argc, const char * argv[]) {
     signal(SIGINT, handle_signal);
 
     vm_ctx vm = vm_create();
-    vm_load_data(vm, lc3os_obj, lc3os_obj_len);
+    vm_load_os(vm);
     vm_load_file(vm, argv[1]);
     vm_run(vm);
     vm_destroy(vm);
