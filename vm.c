@@ -22,7 +22,8 @@ extern unsigned int lc3os_obj_len;
 // MARK: - Types
 
 #define VM_ADDR_MAX UINT16_MAX
-#define VM_REG_COUNT 10
+#define VM_ADDR_INITIAL 0x3000
+#define VM_SIGN_BIT (1 << 15)
 #define VM_STATUS_BIT (1 << 15)
 
 typedef uint16_t vm_byte;
@@ -49,16 +50,31 @@ enum {
 };
 
 enum {
-    VM_ADDR_KBSR = 0xFE00,
-    VM_ADDR_KBDR = 0xFE02,
-    VM_ADDR_DSR  = 0xFE04,
-    VM_ADDR_DDR  = 0xFE06,
-    VM_ADDR_MCR  = 0xFFFE,
+    VM_ADDR_KBSR = 0xfe00,
+    VM_ADDR_KBDR = 0xfe02,
+    VM_ADDR_DSR  = 0xfe04,
+    VM_ADDR_DDR  = 0xfe06,
+    VM_ADDR_MCR  = 0xfffe,
 };
 
 enum {
-    VM_REG_PC = 8,
-    VM_REG_PSR = 9,
+    VM_REG_0 = 0,
+    VM_REG_1,
+    VM_REG_2,
+    VM_REG_3,
+    VM_REG_4,
+    VM_REG_5,
+    VM_REG_6,
+    VM_REG_7,
+    VM_REG_PC,
+    VM_REG_PSR,
+    VM_REG_COUNT
+};
+
+enum {
+    VM_FLAG_NEGATIVE = 0b100,
+    VM_FLAG_ZERO     = 0b010,
+    VM_FLAG_POSITIVE = 0b001,
 };
 
 struct vm_impl {
@@ -72,13 +88,10 @@ static uint16_t swap16(uint16_t val) {
     return (val << 8) | (val >> 8);
 }
 
-static uint16_t zextend(uint16_t val, uint16_t n) {
-    return val & (0xffff >> (16 - n));
-}
-
 static uint16_t sextend(uint16_t val, uint16_t n) {
     uint16_t m = 1 << (n - 1);
-    return (zextend(val, n) ^ m) - m;
+    val &= ((1 << n) - 1);
+    return (val ^ m) - m;
 }
 
 // MARK: - Creation
@@ -86,8 +99,8 @@ static uint16_t sextend(uint16_t val, uint16_t n) {
 vm_ctx vm_create(void) {
     vm_ctx vm = calloc(1, sizeof(struct vm_impl));
 
-    vm->reg[VM_REG_PC] = 0x3000;
-    vm->reg[VM_REG_PSR] = 0b010;
+    vm->reg[VM_REG_PC] = VM_ADDR_INITIAL;
+    vm->reg[VM_REG_PSR] = VM_FLAG_ZERO;
     vm->mem[VM_ADDR_MCR] = VM_STATUS_BIT;
 
     return vm;
@@ -105,16 +118,11 @@ static vm_byte vm_read(vm_ctx vm, vm_addr addr) {
         FD_ZERO(&readfds);
         FD_SET(STDIN_FILENO, &readfds);
 
-        static struct timeval timeout;
+        struct timeval timeout;
         timeout.tv_sec = 0;
         timeout.tv_usec = 0;
 
-        if (select(1, &readfds, NULL, NULL, &timeout)) {
-            return VM_STATUS_BIT;
-        }
-        else {
-            return 0;
-        }
+        return select(1, &readfds, NULL, NULL, &timeout) ? VM_STATUS_BIT : 0;
     }
     else if (addr == VM_ADDR_KBDR) {
         if (vm_read(vm, VM_ADDR_KBSR)) {
@@ -190,14 +198,20 @@ void vm_load_data(vm_ctx vm, unsigned const char *data, size_t length) {
 
 // MARK: - Execution
 
-static void vm_setcc(vm_ctx vm, vm_reg reg) {
-    vm_byte val = vm->reg[reg];
-    vm_byte n = (val >= 0x8000) ? 0b100 : 0;
-    vm_byte z = (val == 0) ? 0b010 : 0;
-    vm_byte p = (val < 0x8000 && val > 0) ? 0b001 : 0;
+static vm_byte vm_sign_flag(uint16_t val) {
+    if (val == 0) {
+        return VM_FLAG_ZERO;
+    }
+    else if (val & VM_SIGN_BIT) {
+        return VM_FLAG_NEGATIVE;
+    }
+    else {
+        return VM_FLAG_POSITIVE;
+    }
+}
 
-    vm->reg[VM_REG_PSR] &= ~0b111;
-    vm->reg[VM_REG_PSR] |= n | z | p;
+static void vm_setcc(vm_ctx vm, vm_reg reg) {
+    vm->reg[VM_REG_PSR] = vm_sign_flag(vm->reg[reg]);
 }
 
 static void vm_perform(vm_ctx vm, vm_byte instr) {
@@ -354,7 +368,7 @@ static void vm_perform(vm_ctx vm, vm_byte instr) {
         }
 
         case VM_OPCODE_TRAP: {
-            vm_addr trapvect8 = zextend(instr, 8);
+            vm_addr trapvect8 = instr & 0xff;
 
             if (trapvect8 == 0x20) {
                 // handle GETC efficiently to prevent high CPU usage when idle
