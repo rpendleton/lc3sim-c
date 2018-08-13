@@ -21,16 +21,17 @@ extern unsigned int lc3os_obj_len;
 
 // MARK: - Types
 
-#define VM_ADDR_MAX UINT16_MAX
-#define VM_ADDR_INITIAL 0x3000
-#define VM_SIGN_BIT (1 << 15)
-#define VM_STATUS_BIT (1 << 15)
+enum {
+    VM_ADDR_MAX = UINT16_MAX,
+    VM_ADDR_INITIAL = 0x3000,
+    VM_SIGN_BIT = 1 << 15,
+    VM_STATUS_BIT = 1 << 15,
+};
 
 typedef uint16_t vm_byte;
 typedef uint16_t vm_addr;
-typedef size_t vm_reg;
 
-enum {
+typedef enum {
     VM_OPCODE_ADD  = 0b0001,
     VM_OPCODE_AND  = 0b0101,
     VM_OPCODE_BR   = 0b0000,
@@ -47,17 +48,17 @@ enum {
     VM_OPCODE_STR  = 0b0111,
     VM_OPCODE_TRAP = 0b1111,
     VM_OPCODE_RESERVED = 0b1101,
-};
+} vm_opcode;
 
-enum {
+typedef enum {
     VM_ADDR_KBSR = 0xfe00,
     VM_ADDR_KBDR = 0xfe02,
     VM_ADDR_DSR  = 0xfe04,
     VM_ADDR_DDR  = 0xfe06,
     VM_ADDR_MCR  = 0xfffe,
-};
+} vm_addr_special;
 
-enum {
+typedef enum {
     VM_REG_0 = 0,
     VM_REG_1,
     VM_REG_2,
@@ -69,13 +70,13 @@ enum {
     VM_REG_PC,
     VM_REG_PSR,
     VM_REG_COUNT
-};
+} vm_reg;
 
-enum {
+typedef enum {
     VM_FLAG_NEGATIVE = 0b100,
     VM_FLAG_ZERO     = 0b010,
     VM_FLAG_POSITIVE = 0b001,
-};
+} vm_flag;
 
 struct vm_impl {
     vm_byte mem[VM_ADDR_MAX];
@@ -113,6 +114,8 @@ void vm_destroy(vm_ctx vm) {
 // MARK: - Memory
 
 static vm_byte vm_read(vm_ctx vm, vm_addr addr) {
+    assert(vm != NULL);
+
     if (addr == VM_ADDR_KBSR) {
         static fd_set readfds;
         FD_ZERO(&readfds);
@@ -143,6 +146,8 @@ static vm_byte vm_read(vm_ctx vm, vm_addr addr) {
 }
 
 static void vm_write(vm_ctx vm, vm_addr addr, vm_byte val) {
+    assert(vm != NULL);
+
     if (addr == VM_ADDR_KBSR || addr == VM_ADDR_KBDR || addr == VM_ADDR_DSR) {
         return;
     }
@@ -156,33 +161,38 @@ static void vm_write(vm_ctx vm, vm_addr addr, vm_byte val) {
 }
 
 void vm_load_os(vm_ctx vm) {
-    vm_load_data(vm, lc3os_obj, lc3os_obj_len);
+    vm_result res = vm_load_data(vm, lc3os_obj, lc3os_obj_len);
+    assert(res == VM_SUCCESS);
 }
 
-void vm_load_file(vm_ctx vm, const char *file) {
+vm_result vm_load_file(vm_ctx vm, const char *file) {
     int fd, ret;
     struct stat statbuf;
     unsigned char *data;
 
     if ((fd = open(file, O_RDONLY)) < 0) {
-        abort();
+        return VM_INPUT_NOT_FOUND;
     }
 
     if ((ret = fstat(fd, &statbuf)) < 0) {
-        abort();
+        return VM_INPUT_NOT_FOUND;
     }
 
     if ((data = mmap(0, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0)) == MAP_FAILED) {
-        abort();
+        return VM_INPUT_NOT_FOUND;
     }
 
-    vm_load_data(vm, data, statbuf.st_size);
+    vm_result result = vm_load_data(vm, data, statbuf.st_size);
 
     munmap(data, statbuf.st_size);
     close(fd);
+
+    return result;
 }
 
-void vm_load_data(vm_ctx vm, unsigned const char *data, size_t length) {
+vm_result vm_load_data(vm_ctx vm, unsigned const char *data, size_t length) {
+    assert(vm != NULL);
+
     vm_addr load_addr = swap16(*((vm_addr*)data));
     size_t load_length = (length - sizeof(vm_addr)) / sizeof(vm_byte);
 
@@ -191,14 +201,20 @@ void vm_load_data(vm_ctx vm, unsigned const char *data, size_t length) {
     vm_byte *dest = vm->mem + load_addr;
     vm_byte *source = (vm_byte*)(data + sizeof(vm_addr));
 
+    if (dest + load_length >= vm->mem + VM_ADDR_MAX) {
+        return VM_INPUT_TOO_LARGE;
+    }
+
     while (length-- > 0) {
         *(dest++) = swap16(*(source++));
     }
+
+    return VM_SUCCESS;
 }
 
 // MARK: - Execution
 
-static vm_byte vm_sign_flag(uint16_t val) {
+static vm_flag vm_sign_flag(uint16_t val) {
     if (val == 0) {
         return VM_FLAG_ZERO;
     }
@@ -211,11 +227,15 @@ static vm_byte vm_sign_flag(uint16_t val) {
 }
 
 static void vm_setcc(vm_ctx vm, vm_reg reg) {
+    assert(vm != NULL);
+
     vm->reg[VM_REG_PSR] = vm_sign_flag(vm->reg[reg]);
 }
 
-static void vm_perform(vm_ctx vm, vm_byte instr) {
-    switch (instr >> 12) {
+static vm_result vm_perform(vm_ctx vm, vm_byte instr) {
+    assert(vm != NULL);
+
+    switch ((vm_opcode)(instr >> 12)) {
         case VM_OPCODE_ADD: {
             vm_reg dr = (instr >> 9) & 0b111;
             vm_reg sr1 = (instr >> 6) & 0b111;
@@ -335,8 +355,7 @@ static void vm_perform(vm_ctx vm, vm_byte instr) {
         }
 
         case VM_OPCODE_RTI: {
-            abort();
-            break;
+            return VM_OPCODE_NOT_IMPLEMENTED;
         }
 
         case VM_OPCODE_ST: {
@@ -384,13 +403,22 @@ static void vm_perform(vm_ctx vm, vm_byte instr) {
         }
 
         case VM_OPCODE_RESERVED:
-            abort();
-            break;
+            return VM_OPCODE_NOT_IMPLEMENTED;
     }
+
+    return VM_SUCCESS;
 }
 
-void vm_run(vm_ctx vm) {
+vm_result vm_run(vm_ctx vm) {
+    assert(vm != NULL);
+
     while (vm_read(vm, VM_ADDR_MCR) & VM_STATUS_BIT) {
-        vm_perform(vm, vm_read(vm, vm->reg[VM_REG_PC]++));
+        vm_result res = vm_perform(vm, vm_read(vm, vm->reg[VM_REG_PC]++));
+
+        if (res != VM_SUCCESS) {
+            return res;
+        }
     }
+
+    return VM_SUCCESS;
 }
