@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 typedef struct vm_impl* vm_ctx;
 
 typedef enum {
@@ -12,6 +14,7 @@ typedef enum {
     VM_INPUT_NOT_FOUND,
     VM_INPUT_TOO_LARGE,
     VM_OPCODE_NOT_IMPLEMENTED,
+    VM_OPCODE_NOP,
 } vm_result;
 
 vm_ctx vm_create(void);
