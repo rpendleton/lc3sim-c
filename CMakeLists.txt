@@ -15,7 +15,7 @@ ADD_CUSTOM_COMMAND(
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 		COMMENT "Generating lc3os.c"
 	)
-	
+
 set(SOURCES
 	main.c
 	${CMAKE_CURRENT_BINARY_DIR}/lc3os.c
@@ -24,10 +24,8 @@ set(SOURCES
 	)
 
 set(CMAKE_C_COMPILER gcc)
-add_executable(lc3sim-c 
+add_executable(lc3sim-c
 	${SOURCES}
 	)
 target_compile_options(lc3sim-c PRIVATE -O2 -Wall -g --std=c11)
 set_target_properties(lc3sim-c PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${INSTALL_DIR}/")
-
-

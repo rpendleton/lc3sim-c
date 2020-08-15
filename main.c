@@ -79,7 +79,6 @@ int main(int argc, const char * argv[]) {
 
     switch (res) {
         case VM_SUCCESS:
-        case VM_OPCODE_NOP:
             break;
 
         case VM_INPUT_NOT_FOUND:

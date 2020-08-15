@@ -295,14 +295,12 @@ static vm_result vm_perform(vm_ctx vm, vm_byte instr) {
                 vm->reg[VM_REG_PC] += pc_offset9;
             }
 
-            if (instr == 0)
-                return VM_OPCODE_NOP;
             break;
         }
 
         case VM_OPCODE_JMP: {
             vm_reg baser = (instr >> 6) & 0b111;
- 
+
             DEBUG_TRACE("VM_OPCODE_JMP %x %x\n", baser, instr);
 
             vm->reg[VM_REG_PC] = vm->reg[baser];
