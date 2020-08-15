@@ -47,25 +47,20 @@ int main(int argc, const char * argv[]) {
         return VM_EXIT_USAGE;
     }
 
-    vm_result res;
     vm_ctx vm = vm_create();
     vm_load_os(vm);
 
-    res = vm_load_file(vm, argv[1]);
+    vm_load_result load_result = vm_load_file(vm, argv[1]);
 
-    switch (res) {
-        case VM_SUCCESS:
+    switch (load_result) {
+        case VM_LOAD_SUCCESS:
             break;
 
-        case VM_OPCODE_NOT_IMPLEMENTED:
-            assert(0);
-            break;
-
-        case VM_INPUT_NOT_FOUND:
+        case VM_LOAD_INPUT_NOT_FOUND:
             fprintf(stderr, "%s: Failed to load input: %s\n", argv[0], strerror(errno));
             return VM_EXIT_INPUT_INVALID;
 
-        case VM_INPUT_TOO_LARGE:
+        case VM_LOAD_INPUT_TOO_LARGE:
             fprintf(stderr, "%s: Failed to load input: Input exceeded memory space\n", argv[0]);
             return VM_EXIT_INPUT_INVALID;
     }
@@ -73,20 +68,15 @@ int main(int argc, const char * argv[]) {
     disable_input_buffering();
     signal(SIGINT, handle_signal);
 
-    res = vm_run(vm);
+    vm_run_result run_result = vm_run(vm);
 
     restore_input_buffering();
 
-    switch (res) {
-        case VM_SUCCESS:
+    switch (run_result) {
+        case VM_RUN_SUCCESS:
             break;
 
-        case VM_INPUT_NOT_FOUND:
-        case VM_INPUT_TOO_LARGE:
-            assert(0);
-            break;
-
-        case VM_OPCODE_NOT_IMPLEMENTED:
+        case VM_RUN_UNIMPLEMENTED_OPCODE:
             fprintf(stderr, "%s: Failed to execute input: Attempted to execute unimplemented opcode\n", argv[0]);
             return VM_EXIT_OPCODE_INVALID;
     }
