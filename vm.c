@@ -308,19 +308,27 @@ static vm_run_result vm_perform(vm_ctx vm, vm_byte instr) {
         }
 
         case VM_OPCODE_JSR: {
+            // If this is a JSR R7 instruction, we need to make sure we don't accidentally overwrite the value in R7
+            // before using it for the jump. These steps don't strictly match the ones in the 2nd edition of the book,
+            // but according to documentation in the official lc3tools simulator, these steps perform the instruction
+            // how it was intended. Future editions of the book will address this inconsistency.
+            vm_addr original_pc = vm->reg[VM_REG_PC];
+
             if (instr & (1 << 11)) {
-                vm->reg[7] = vm->reg[VM_REG_PC];
                 vm_addr pc_offset11 = sextend(instr, 11);
                 DEBUG_TRACE("VM_OPCODE_JSR pc_offset11 %x\n", pc_offset11);
+
                 vm->reg[VM_REG_PC] += pc_offset11;
             }
             else {
                 vm_reg baser = (instr >> 6) & 0b111;
-                vm_reg tmp = vm->reg[baser];
-                vm->reg[7] = vm->reg[VM_REG_PC];
-                DEBUG_TRACE("VM_OPCODE_JSR baser %x val %x\n", baser, tmp);
-                vm->reg[VM_REG_PC] = tmp;
+                vm_reg baser_value = vm->reg[baser];
+                DEBUG_TRACE("VM_OPCODE_JSR baser %x val %x\n", baser, baser_value);
+
+                vm->reg[VM_REG_PC] = baser_value;
             }
+
+            vm->reg[7] = original_pc;
 
             break;
         }
