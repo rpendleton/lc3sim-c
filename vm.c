@@ -17,7 +17,7 @@
 #include "vm.h"
 
 #ifdef TRACE
-#   define DEBUG_TRACE printf
+#   define DEBUG_TRACE(...) fprintf(stderr, __VA_ARGS__)
 #else
 #   define DEBUG_TRACE(...)
 #endif
@@ -250,14 +250,16 @@ static vm_run_result vm_perform(vm_ctx vm, vm_byte instr) {
             vm_reg dr = (instr >> 9) & 0b111;
             vm_reg sr1 = (instr >> 6) & 0b111;
 
-            DEBUG_TRACE("VM_OPCODE_ADD dr %x sr %x\n", dr, sr1);
-
             if (instr & (1 << 5)) {
                 vm_byte imm5 = sextend(instr, 5);
+                DEBUG_TRACE("VM_OPCODE_ADD dr %x sr1 %x imm5 %x\n", dr, sr1, imm5);
+
                 vm->reg[dr] = vm->reg[sr1] + imm5;
             }
             else {
                 vm_reg sr2 = instr & 0b111;
+                DEBUG_TRACE("VM_OPCODE_ADD dr %x sr1 %x sr2 %x\n", dr, sr1, sr2);
+
                 vm->reg[dr] = vm->reg[sr1] + vm->reg[sr2];
             }
 
@@ -269,14 +271,16 @@ static vm_run_result vm_perform(vm_ctx vm, vm_byte instr) {
             vm_reg dr = (instr >> 9) & 0b111;
             vm_reg sr1 = (instr >> 6) & 0b111;
 
-            DEBUG_TRACE("VM_OPCODE_AND dr %x sr %x\n", dr, sr1);
-
             if (instr & (1 << 5)) {
                 vm_byte imm5 = sextend(instr, 5);
+                DEBUG_TRACE("VM_OPCODE_AND dr %x sr1 %x imm5 %x\n", dr, sr1, imm5);
+
                 vm->reg[dr] = vm->reg[sr1] & imm5;
             }
             else {
                 vm_reg sr2 = instr & 0b111;
+                DEBUG_TRACE("VM_OPCODE_AND dr %x sr1 %x sr2 %x\n", dr, sr1, sr2);
+
                 vm->reg[dr] = vm->reg[sr1] & vm->reg[sr2];
             }
 
@@ -287,11 +291,10 @@ static vm_run_result vm_perform(vm_ctx vm, vm_byte instr) {
         case VM_OPCODE_BR: {
             vm_byte current_nzp = vm->reg[VM_REG_PSR] & 0b111;
             vm_byte desired_nzp = (instr >> 9) & 0b111;
-
-            DEBUG_TRACE("VM_OPCODE_BR current_nzp %x desired_nzp %x\n", current_nzp, desired_nzp);
+            vm_addr pc_offset9 = sextend(instr, 9);
+            DEBUG_TRACE("VM_OPCODE_BR current_nzp %x desired_nzp %x pc_offset9 %x\n", current_nzp, desired_nzp, pc_offset9);
 
             if (current_nzp & desired_nzp) {
-                vm_addr pc_offset9 = sextend(instr, 9);
                 vm->reg[VM_REG_PC] += pc_offset9;
             }
 
@@ -300,8 +303,7 @@ static vm_run_result vm_perform(vm_ctx vm, vm_byte instr) {
 
         case VM_OPCODE_JMP: {
             vm_reg baser = (instr >> 6) & 0b111;
-
-            DEBUG_TRACE("VM_OPCODE_JMP %x %x\n", baser, instr);
+            DEBUG_TRACE("VM_OPCODE_JMP baser %x\n", baser);
 
             vm->reg[VM_REG_PC] = vm->reg[baser];
             break;
@@ -323,7 +325,7 @@ static vm_run_result vm_perform(vm_ctx vm, vm_byte instr) {
             else {
                 vm_reg baser = (instr >> 6) & 0b111;
                 vm_reg baser_value = vm->reg[baser];
-                DEBUG_TRACE("VM_OPCODE_JSR baser %x val %x\n", baser, baser_value);
+                DEBUG_TRACE("VM_OPCODE_JSR baser %x baser_value %x\n", baser, baser_value);
 
                 vm->reg[VM_REG_PC] = baser_value;
             }
@@ -336,24 +338,22 @@ static vm_run_result vm_perform(vm_ctx vm, vm_byte instr) {
         case VM_OPCODE_LD: {
             vm_reg dr = (instr >> 9) & 0b111;
             vm_addr pc_offset9 = sextend(instr, 9);
-
             DEBUG_TRACE("VM_OPCODE_LD dr %x pc_offset9 %x\n", dr, pc_offset9);
 
             vm->reg[dr] = vm_read(vm, vm->reg[VM_REG_PC] + pc_offset9);
-
             vm_setcc(vm, dr);
+
             break;
         }
 
         case VM_OPCODE_LDI: {
             vm_reg dr = (instr >> 9) & 0b111;
             vm_addr pc_offset9 = sextend(instr, 9);
-
             DEBUG_TRACE("VM_OPCODE_LDI dr %x pc_offset9 %x\n", dr, pc_offset9);
 
             vm->reg[dr] = vm_read(vm, vm_read(vm, vm->reg[VM_REG_PC] + pc_offset9));
-
             vm_setcc(vm, dr);
+
             break;
         }
 
@@ -361,36 +361,33 @@ static vm_run_result vm_perform(vm_ctx vm, vm_byte instr) {
             vm_reg dr = (instr >> 9) & 0b111;
             vm_reg baser = (instr >> 6) & 0b111;
             vm_addr offset6 = sextend(instr, 6);
-
-            DEBUG_TRACE("VM_OPCODE_LDR dr %x baser %x\n", dr, baser);
+            DEBUG_TRACE("VM_OPCODE_LDR dr %x baser %x offset6 %x\n", dr, baser, offset6);
 
             vm->reg[dr] = vm_read(vm, vm->reg[baser] + offset6);
-
             vm_setcc(vm, dr);
+
             break;
         }
 
         case VM_OPCODE_LEA: {
             vm_reg dr = (instr >> 9) & 0b111;
             vm_addr pc_offset9 = sextend(instr, 9);
-
             DEBUG_TRACE("VM_OPCODE_LEA dr %x pc_offset9 %x\n", dr, pc_offset9);
 
             vm->reg[dr] = vm->reg[VM_REG_PC] + pc_offset9;
-
             vm_setcc(vm, dr);
+
             break;
         }
 
         case VM_OPCODE_NOT: {
             vm_reg dr = (instr >> 9) & 0b111;
             vm_reg sr = (instr >> 6) & 0b111;
-
             DEBUG_TRACE("VM_OPCODE_NOT dr %x sr %x\n", dr, sr);
 
             vm->reg[dr] = ~vm->reg[sr];
-
             vm_setcc(vm, dr);
+
             break;
         }
 
@@ -402,7 +399,6 @@ static vm_run_result vm_perform(vm_ctx vm, vm_byte instr) {
         case VM_OPCODE_ST: {
             vm_reg sr = (instr >> 9) & 0b111;
             vm_addr pc_offset9 = sextend(instr, 9);
-
             DEBUG_TRACE("VM_OPCODE_ST sr %x pc_offset9 %x\n", sr, pc_offset9);
 
             vm_write(vm, vm->reg[VM_REG_PC] + pc_offset9, vm->reg[sr]);
@@ -413,7 +409,6 @@ static vm_run_result vm_perform(vm_ctx vm, vm_byte instr) {
         case VM_OPCODE_STI: {
             vm_reg sr = (instr >> 9) & 0b111;
             vm_addr pc_offset9 = sextend(instr, 9);
-
             DEBUG_TRACE("VM_OPCODE_STI sr %x pc_offset9 %x\n", sr, pc_offset9);
 
             vm_write(vm, vm_read(vm, vm->reg[VM_REG_PC] + pc_offset9), vm->reg[sr]);
@@ -425,8 +420,7 @@ static vm_run_result vm_perform(vm_ctx vm, vm_byte instr) {
             vm_reg sr = (instr >> 9) & 0b111;
             vm_reg baser = (instr >> 6) & 0b111;
             vm_addr offset6 = sextend(instr, 6);
-
-            DEBUG_TRACE("VM_OPCODE_STR sr %x baser %x\n", sr, baser);
+            DEBUG_TRACE("VM_OPCODE_STR sr %x baser %x offset6 %x\n", sr, baser, offset6);
 
             vm_write(vm, vm->reg[baser] + offset6, vm->reg[sr]);
 
@@ -435,7 +429,6 @@ static vm_run_result vm_perform(vm_ctx vm, vm_byte instr) {
 
         case VM_OPCODE_TRAP: {
             vm_addr trapvect8 = instr & 0xff;
-
             DEBUG_TRACE("VM_OPCODE_TRAP trapvect8 %x\n", trapvect8);
 
             if (trapvect8 == 0x20) {

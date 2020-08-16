@@ -1,3 +1,4 @@
-build/
-lc3sim
-lc3os.c
+/build/
+/lc3sim
+/lc3sim-trace
+/lc3os.c
