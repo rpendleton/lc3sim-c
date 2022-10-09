@@ -36,6 +36,8 @@ static void restore_input_buffering() {
 }
 
 static void handle_signal(int signal) {
+    if (signal != SIGINT) return;
+
     restore_input_buffering();
     printf("\n");
     exit(-2);
