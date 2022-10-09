@@ -9,3 +9,5 @@ jobs:
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
           cmake --build build
+      - name: Run Tests
+        run: ctest --test-dir build
