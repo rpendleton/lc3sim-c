@@ -1,4 +1,4 @@
-name: "CI: make"
+name: ubuntu
 on: [push]
 jobs:
   build:
@@ -6,4 +6,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build
-        run: make
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build
