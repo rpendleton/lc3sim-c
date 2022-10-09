@@ -25,3 +25,6 @@ if(ENABLE_TRACING)
 endif()
 
 target_compile_options(lc3sim PRIVATE -Wall -Wextra)
+
+include(CTest)
+add_subdirectory(tests)
