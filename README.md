@@ -25,7 +25,7 @@ and [generators][cmake-generators].
 If your IDE isn't supported or you'd prefer to build using a command line generator, it's easy to
 get started. For example, to build in debug mode:
 
-```
+```sh
 # initialize the build scripts
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 
@@ -39,7 +39,7 @@ cmake --build build
 If you find yourself in need of trace-level logs for the VM's state, you can enable them by turning
 on the `ENABLE_TRACING` flag and then rebuilding:
 
-```
+```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_TRACING=ON
 cmake --build build
 ```
