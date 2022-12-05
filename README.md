@@ -43,3 +43,24 @@ on the `ENABLE_TRACING` flag and then rebuilding:
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_TRACING=ON
 cmake --build build
 ```
+
+## Running tests
+
+At the time of writing these instructions, this project only has a single "hello world!" unit test.
+Even so, this simple test can still detect some more obvious failures if something goes really
+wrong.
+
+The unit tests for this project are defined using standard CMake/CTest conventions, so to run them,
+you can either use your IDE's integrated unit test runner (if it has one), or by running the
+following on command line:
+
+```sh
+# initialize the build scripts if you haven't already
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+
+# build or rebuild if you haven't already
+cmake --build build
+
+# run the tests
+ctest --test-dir build
+```
